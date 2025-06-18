@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Penghitung Waktu Tarif Parkir</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet" />
+<style>
+  /* Reset dan dasar */
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin:0; padding:0;
+    font-family: 'Inter', sans-serif;
+    background: #f9f9f9;
+    color: #222;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+  }
+  .container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 32px 32px;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
+    font-weight: 700;
+    margin-bottom: 24px;
+    text-align: center;
+    color: #111;
+  }
+  label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+    font-size: 1rem;
+    color: #333;
+  }
+  input[type="time"] {
+    width: 100%;
+    font-size: 1.15rem;
+    padding: 10px 8px;
+    border: none;
+    border-bottom: 2px solid #ccc;
+    outline: none;
+    transition: border-color 0.25s ease;
+    color: #222;
+    background: transparent;
+    border-radius: 0;
+  }
+  input[type="time"]:focus {
+    border-color: #6366f1;
+  }
+  button {
+    margin-top: 28px;
+    width: 100%;
+    font-size: 1.15rem;
+    padding: 12px 0;
+    background-color: #6366f1;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    color: white;
+    transition: background-color 0.3s ease;
+    box-shadow: none;
+  }
+  button:hover, button:focus {
+    background-color: #4f46e5;
+    outline: none;
+  }
+  .result {
+    margin-top: 32px;
+    font-size: clamp(1.4rem, 3vw, 1.8rem);
+    font-weight: 700;
+    text-align: center;
+    min-height: 48px;
+    line-height: 1.3;
+    color: #111;
+  }
+  .tarif {
+    margin-top: 8px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-align: center;
+    color: #555;
+  }
+  .info-text {
+    font-size: 0.85rem;
+    text-align: center;
+    margin-top: 6px;
+    color: #777;
+  }
+  /* Responsive tweaks */
+  @media (max-width: 420px) {
+    .container {
+      padding: 24px 24px;
+    }
+  }
+</style>
+</head>
+<body>
+  <main class="container" role="main" aria-label="Aplikasi penghitung waktu real-time dengan tarif">
+    <h1>Penghitung Tarif Parkir</h1>
+    <form id="timeForm" aria-describedby="desc">
+      <label for="inputTime">Masukkan waktu masuk (jam dan menit):</label>
+      <input type="time" id="inputTime" name="inputTime" required aria-required="true" aria-label="Input waktu dalam format jam dan menit" />
+      <button type="submit" aria-live="polite" aria-atomic="true" aria-relevant="additions">Hitung Tarif</button>
+    </form>
+    <div id="desc" class="info-text">
+      Waktu sekarang akan dibandingkan secara real-time dengan waktu yang Anda masukkan.<br/>
+      Tarif Rp 2000 untuk setiap 2 jam penuh dengan minimal Rp 2000 walaupun kurang dari 2 jam.
+    </div>
+    <div id="result" class="result" aria-live="polite" aria-atomic="true"></div>
+    <div id="tarif" class="tarif" aria-live="polite" aria-atomic="true"></div>
+  </main>
+
+  <script>
+    (function(){
+      const form = document.getElementById('timeForm');
+      const inputTime = document.getElementById('inputTime');
+      const result = document.getElementById('result');
+      const tarifEl = document.getElementById('tarif');
+
+      let targetTime = null;
+      let timerInterval = null;
+
+      // Hitung selisih waktu sekarang dan waktu target dalam detik (dihari saat ini)
+      function hitungSelisih() {
+        if (!targetTime) return;
+
+        const sekarang = new Date();
+
+        // Ambil hari, bulan, tahun sekarang
+        const year = sekarang.getFullYear();
+        const month = sekarang.getMonth();
+        const date = sekarang.getDate();
+
+        // Buat Date target di hari ini sesuai input pengguna
+        const target = new Date(year, month, date, targetTime.hours, targetTime.minutes, 0);
+
+        // Selisih dalam milidetik
+        let diffMs = sekarang - target; // positif jika sekarang > target (waktu sudah lewat)
+        const absDiff = Math.abs(diffMs);
+        const isAfter = diffMs >= 0;
+
+        // Konversi ke jam, menit, detik
+        const jam = Math.floor(absDiff / (1000 * 60 * 60));
+        const menit = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
+        const detik = Math.floor((absDiff % (1000 * 60)) / 1000);
+
+        // Hitung tarif: Rp2000 setiap 2 jam penuh dengan minimal Rp 2000 walaupun kurang dari 2 jam
+        const totalJam = absDiff / (1000 * 60 * 60);
+        const kelipatanDuaJam = Math.max(1, Math.floor(totalJam / 2));
+        const tarif = 2000 * kelipatanDuaJam;
+
+        let teks = '';
+        if (isAfter) {
+          teks = `Sudah lewat ${jam} jam ${menit} menit ${detik} detik dari waktu input.`;
+        } else {
+          teks = `Belum mencapai waktu input, tersisa ${jam} jam ${menit} menit ${detik} detik lagi.`;
+        }
+
+        result.textContent = teks;
+        tarifEl.textContent = `Tarif saat ini: Rp ${tarif.toLocaleString('id-ID')}`;
+      }
+
+      function mulaiHitung() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+          hitungSelisih();
+        }, 1000);
+        hitungSelisih();
+      }
+
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        const val = inputTime.value;
+        if (!val) return;
+
+        const parts = val.split(':');
+        if(parts.length !== 2) {
+          result.textContent = "Format waktu tidak valid.";
+          tarifEl.textContent = '';
+          return;
+        }
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+
+        if (
+          isNaN(hours) || hours < 0 || hours > 23 ||
+          isNaN(minutes) || minutes < 0 || minutes > 59
+        ) {
+          result.textContent = "Waktu tidak valid. Pastikan jam antara 00-23 dan menit antara 00-59.";
+          tarifEl.textContent = '';
+          return;
+        }
+        targetTime = { hours, minutes };
+        mulaiHitung();
+      });
+    })();
+  </script>
+</body>
+</html>
+
